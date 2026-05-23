@@ -24,6 +24,43 @@ The target is whatever page `$ARGUMENTS` resolves to. Clone exactly what's visib
 
 If the user provides additional instructions (specific fidelity level, customizations, extra context), honor those over the defaults.
 
+## Cloning Modes: Greenfield vs Existing-Project
+
+Decide which mode you're in **before** Pre-Flight — it changes Phase 2 (Foundation) drastically.
+
+- **Greenfield (default):** the clone gets its own fresh scaffold. You own `globals.css`, `layout.tsx`, and `src/app/page.tsx` — overwrite design tokens, swap fonts, and build the page top-level exactly as written below.
+- **Existing-project / Calibration:** the user is cloning a page (or a single component) **into a live product that already has its own brand and design system** — e.g., refining one admin page to match a competitor. Here the rules invert:
+  - **Do NOT overwrite the host's `globals.css` tokens, `layout.tsx` fonts, or theme colors.** The host keeps its own brand.
+  - **Do NOT build into `src/app/page.tsx`.** Target the specific component/route the user named.
+  - Foundation phase becomes "extend, don't replace": add only *missing* tokens/types, scoped so existing pages don't shift.
+  - The deliverable is a **calibration** — apply the target's *measurements* (sizes, spacing, radii, type scale, layout structure) to the host component, expressed in the host's own tokens.
+
+If it's not obvious which mode applies, ask one question: "fresh scaffold, or cloning into an existing project?"
+
+## Brand & IP Boundary
+
+Cloning a **competitor** into your own product is a common case — and copying their brand is both a brand-identity mistake and a legal risk. Separate two layers and treat them differently:
+
+- **Functional layout facts — safe to replicate exactly:** dimensions, spacing, border-radius, type scale, grid/flex structure, interaction model, component composition. Extract these precisely via `getComputedStyle()`.
+- **Brand expression — do NOT copy into a competing product:** logo, wordmark, brand-specific signature color, marketing copy, photography/illustration. Keep the **host's** logo, brand color, and content.
+
+Default for a competitor clone: **match the layout/proportions, keep the host's brand.** Before downloading a logo/wordmark or hard-coding the target's signature brand color, pause and confirm with the user. (A pure-emulation greenfield demo may copy freely; a competitor-into-your-own-product clone may not.)
+
+## Authenticated & SPA Targets
+
+- The target may sit **behind a login** (dashboards, admin tools). Use the user's **already-logged-in browser session** — read-only inspection only.
+- **Never log in on the user's behalf**, and never type into a credential field even if the browser has it autofilled. If the session has expired, ask the user to log back in and continue once they have.
+- Extract **only UI structure and styles** — never the user's personal data, account contents, or any other tenant's data.
+- On SPAs, class-name heuristics are unreliable (hashed/utility classes, no semantic ids). When a selector-by-class approach finds nothing, **fall back to dimension-based discovery**: scan every element and filter by bounding-box size/aspect to locate the "screen", "card", "header", or "nav" you need. Example:
+  ```javascript
+  // Find phone-screen-like preview boxes when class selectors fail (tune ranges per target)
+  [...document.querySelectorAll('*')]
+    .filter(el => { const r = el.getBoundingClientRect();
+      return r.width >= 300 && r.width <= 480 && r.height >= 560; })
+    .map(el => { const r = el.getBoundingClientRect(); const cs = getComputedStyle(el);
+      return { w: Math.round(r.width), h: Math.round(r.height), radius: cs.borderTopLeftRadius, shadow: cs.boxShadow.slice(0, 40) }; });
+  ```
+
 ## Pre-Flight
 
 1. **Browser automation is required.** Check for available browser MCP tools (Chrome MCP, Playwright MCP, Browserbase MCP, Puppeteer MCP, etc.). Use whichever is available — if multiple exist, prefer Chrome MCP. If none are detected, ask the user which browser tool they have and how to connect it. This skill cannot work without browser automation.
